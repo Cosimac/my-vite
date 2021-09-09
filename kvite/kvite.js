@@ -1,7 +1,7 @@
 /*
  * @Date: 2021-09-04 19:43:39
  * @LastEditors: Cosima
- * @LastEditTime: 2021-09-05 03:57:14
+ * @LastEditTime: 2021-09-10 01:04:28
  * @FilePath: /my-vite/kvite/kvite.js
  */
 
@@ -16,14 +16,17 @@ const app = new Koa()
 app.use(async ctx => {
   const { url, query } = ctx.request
   if (url === '/') {
+    // 加载 index.html文件
     ctx.type = 'text/html'
     ctx.body = fs.readFileSync(path.join(__dirname, './index.html'), 'utf8')
-  } else if (url.endsWith('.js')) {
+  }
+  else if (url.endsWith('.js')) {
+    // js文件的加载处理
     const p = path.join(__dirname, url)
-    // console.log(p, url, __dirname, 'p----');
     ctx.type = 'application/javascript'
     ctx.body = rewriteImport(fs.readFileSync(p, 'utf8'))
-  } else if (url.startsWith('/@modules/')) {
+  }
+  else if (url.startsWith('/@modules/')) {
     // 模块名称
     const moduleName = url.replace('/@modules/', '')
     // 模块绝对路径
@@ -33,7 +36,8 @@ app.use(async ctx => {
     const ret = fs.readFileSync(filePath, 'utf8')
     ctx.type = 'application/javascript'
     ctx.body = rewriteImport(ret)
-  } else if (url.indexOf('.vue') > -1) {
+  }
+  else if (url.indexOf('.vue') > -1) {
     const p = path.join(__dirname, url.split('?')[0])
     const ret = compilerSFC.parse(fs.readFileSync(p, 'utf8'))
     if (!query.type) {
@@ -41,8 +45,10 @@ app.use(async ctx => {
       // 读取vue文件 解析为js
       // 获取脚本内容
       const scriptContent = ret.descriptor.script.content
-      // 替换默认熬出常量方便修改
+      // console.log(ret.descriptor.script, 'ret-----');
+      // 替换默认导出常量
       const script = scriptContent.replace('export default ', 'const __script = ')
+      // console.log(script, 'script-----');
       ctx.type = 'application/javascript'
       ctx.body = `
         ${rewriteImport(script)}
@@ -54,7 +60,6 @@ app.use(async ctx => {
     } else if (query.type === 'template') {
       const tpl = ret.descriptor.template.content
       const render = compilerDOM.compile(tpl, { mode: 'module' }).code
-      console.log(render, 'render----')
       ctx.type = 'application/javascript'
       ctx.body = rewriteImport(render)
     }
@@ -63,7 +68,7 @@ app.use(async ctx => {
 
 // 裸模块引入地址替换
 function rewriteImport(content) {
-  // 匹配 import xxx from 'vue'
+  // 匹配 import xxx from 'vue'  --->  import xxx from '/@modules/vue'
   return content.replace(/ from ['"](.*)['"]/g, function (s1, s2) {
     if (s2.startsWith('/') || s2.startsWith('./' || s2.startsWith('../'))) {
       return s1
